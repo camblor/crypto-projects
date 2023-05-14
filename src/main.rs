@@ -1,24 +1,81 @@
-use rand::{Rng, random, distributions::{Uniform}};
-use ndarray::Array;
-
-fn generate_random_number(min: u32, max: u32) -> u32 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(min..=max)
+use rand::{Rng, distributions::{Uniform}};
+use ndarray::{Array, Dim};
+struct PublicKey {
+    a: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
+    b: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
 }
 
-fn test_random_matrix() -> (){
-    let nrows = 5;
-    let ncols = 5;
+struct SecretKey(Array<i128, Dim<[usize; 2]>>);
 
-    let a = Array::from_shape_fn((nrows, ncols), |_| random::<f64>());
+struct Ciphertext {
+    u: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
+    v: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
+}
 
-    println!("MATRIX {:?}", a);
+const Q: i128 = 13;
+
+fn keygen() -> (PublicKey, SecretKey){
+    let nrows = 7;
+    let ncols = 4;
+    let mut rng = rand::thread_rng();
+
+    let a = Array::from_shape_fn((nrows, ncols), |_|  rng.gen_range(0..Q));
+    let s_a = Array::from_shape_fn((ncols, 1), |_|  rng.gen_range(0..Q));
+    let e_a = Array::from_shape_fn((nrows, 1), |_|  rng.gen_range(0..=1));
+
+    // println!("A {:?}", a);
+    // println!("sA {:?}", s_a);
+    // println!("eA {:?}", e_a);
+
+    let result = (a.dot(&s_a).mapv(|x| x % Q) + e_a).mapv(|x| x % Q);
+    //println!("result {:?}", result);
+
+    let pk = PublicKey {
+        a,
+        b: result
+    };
+
+    let sk = SecretKey(s_a);
+
+    (pk, sk)
+}
+
+fn encrypt(pk: PublicKey, m: i128) -> Ciphertext{
+    let mut rng = rand::thread_rng();
+    let r = Array::from_shape_fn((1,7), |_|  rng.gen_range(0..=1));
+    let u = r.dot(&pk.a).mapv(|x| x % Q);
+    let v = (r.dot(&pk.b).mapv(|x| x % Q) + 1 * 13 / 2).mapv(|x| x % Q);
+    println!("Encrypt  {:?}", m);
+    //println!("u {:?}", u);
+    //println!("v {:?}", v);
+    let ciphertext = Ciphertext {
+        u,
+        v
+    };
+
+    ciphertext
+}
+
+fn decrypt(sk: SecretKey, ciphertext: Ciphertext) -> () {
+    let w = ciphertext.u.dot(&sk.0).mapv(|x| x % Q);
+    println!("ciphertext.v {:?}", ciphertext.v);
+    println!("w {:?}", w);
+    let w: i128 = w[[0, 0]];
+    let cipherv: i128 = ciphertext.v[[0, 0]];
+    let result: i128;
+    if cipherv >= w {
+        result = ((cipherv - w) % 13).try_into().unwrap();
+    } else {
+        result = (((Q-1) - (w - cipherv)) % 13).try_into().unwrap();
+    }
+    // w = ciphertext.v.sub(w);
+    // w = w.mapv(|x| x % Q);
+    println!("result {:?}", result);
 }
 
 fn main() {
-    fizzbuzz();
     let range = Uniform::from(0..20);
-
+    
     let mut a = Vec::new();
 
     let mut values: Vec<u64> = rand::thread_rng().sample_iter(&range).take(100).collect();
@@ -29,20 +86,13 @@ fn main() {
 
 
     //println!("Vectorized: {:?}", values);
-    println!("Matrix: {:?}", a);
-    test_random_matrix();
-}
+    //println!("Matrix: {:?}", a);
+    let (pk, sk) = keygen();
 
-fn fizzbuzz() -> () {
-    let mut i = 0;
-    let mut vec = Vec::new();
+    let m: i128 = 0;
 
-    loop {
-        if i > 10 {
-            break;
-        }
-        vec.push(generate_random_number(1, 100));
-        i += 1;
-    }
-    println!("Vector: {:?}", vec);
+
+
+    let ciphertext = encrypt(pk, m);
+    decrypt(sk, ciphertext);
 }
