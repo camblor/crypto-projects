@@ -1,98 +1,68 @@
-use rand::{Rng, distributions::{Uniform}};
+use rand::{Rng};
 use ndarray::{Array, Dim};
 struct PublicKey {
     a: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
     b: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
 }
 
-struct SecretKey(Array<i128, Dim<[usize; 2]>>);
+struct SecretKey(i128);
+
 
 struct Ciphertext {
-    u: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
-    v: Array<i128, Dim<[usize; 2]>>, // 2D array of f64
+    u: i128, // 2D array of f64
+    v: i128, // 2D array of f64
 }
 
-const Q: i128 = 13;
+const Q: i128 = 97;
 
-fn keygen() -> (PublicKey, SecretKey){
-    let nrows = 7;
-    let ncols = 4;
+fn keygen() -> (PublicKey, SecretKey) {
+    let n  = 20;
     let mut rng = rand::thread_rng();
+    let s: i128 = rng.gen_range(0..10000);
+    let aaaa = Array::from_shape_fn((n, 1), |_|  rng.gen_range(0..Q));
+    let eeee = Array::from_shape_fn((n, 1), |_|  rng.gen_range(0..4));
+    let b  = (aaaa.clone() * s % Q) + eeee % Q;
 
-    let a = Array::from_shape_fn((nrows, ncols), |_|  rng.gen_range(0..Q));
-    let s_a = Array::from_shape_fn((ncols, 1), |_|  rng.gen_range(0..Q));
-    let e_a = Array::from_shape_fn((nrows, 1), |_|  rng.gen_range(0..=1));
-
-    // println!("A {:?}", a);
-    // println!("sA {:?}", s_a);
-    // println!("eA {:?}", e_a);
-
-    let result = (a.dot(&s_a).mapv(|x| x % Q) + e_a).mapv(|x| x % Q);
-    //println!("result {:?}", result);
-
-    let pk = PublicKey {
-        a,
-        b: result
-    };
-
-    let sk = SecretKey(s_a);
-
-    (pk, sk)
+    (PublicKey{a: aaaa,b}, SecretKey(s))
 }
 
-fn encrypt(pk: PublicKey, m: i128) -> Ciphertext{
-    let mut rng = rand::thread_rng();
-    let r = Array::from_shape_fn((1,7), |_|  rng.gen_range(0..=1));
-    let u = r.dot(&pk.a).mapv(|x| x % Q);
-    let v = (r.dot(&pk.b).mapv(|x| x % Q) + 1 * 13 / 2).mapv(|x| x % Q);
-    println!("Encrypt  {:?}", m);
-    //println!("u {:?}", u);
-    //println!("v {:?}", v);
-    let ciphertext = Ciphertext {
-        u,
-        v
-    };
+fn encrypt(pk: &PublicKey, m: i128) -> Ciphertext{
 
-    ciphertext
+    let u  = pk.a.sum() % Q;
+    let v =  (pk.b.sum() % Q + Q/2*m) % Q;
+
+    Ciphertext {u, v}
 }
 
-fn decrypt(sk: SecretKey, ciphertext: Ciphertext) -> () {
-    let w = ciphertext.u.dot(&sk.0).mapv(|x| x % Q);
-    println!("ciphertext.v {:?}", ciphertext.v);
-    println!("w {:?}", w);
-    let w: i128 = w[[0, 0]];
-    let cipherv: i128 = ciphertext.v[[0, 0]];
-    let result: i128;
-    if cipherv >= w {
-        result = ((cipherv - w) % 13).try_into().unwrap();
+fn decrypt(sk: &SecretKey, ciphertext: Ciphertext) -> (i32) {
+    let mut res =  (ciphertext.v - sk.0*ciphertext.u) % Q;
+    if res < 0 {
+        res = Q + res;
+    } 
+
+    if res < Q/2 {
+        0
     } else {
-        result = (((Q-1) - (w - cipherv)) % 13).try_into().unwrap();
+        1
     }
-    // w = ciphertext.v.sub(w);
-    // w = w.mapv(|x| x % Q);
-    println!("result {:?}", result);
 }
 
 fn main() {
-    let range = Uniform::from(0..20);
-    
-    let mut a = Vec::new();
+    // let (pk, sk) = keygen();
 
-    let mut values: Vec<u64> = rand::thread_rng().sample_iter(&range).take(100).collect();
-    a.push(values);
-
-    values = rand::thread_rng().sample_iter(&range).take(100).collect();
-    a.push(values);
+    // let m: i128 = 0;
 
 
-    //println!("Vectorized: {:?}", values);
-    //println!("Matrix: {:?}", a);
+
+    // let ciphertext = encrypt(pk, m);
+    // decrypt(sk, ciphertext);
+
     let (pk, sk) = keygen();
+    let ciphertext1 = encrypt(&pk, 1);
+    let ciphertext2 = encrypt(&pk, 1);
+    let plain1 = decrypt(&sk, ciphertext1);
+    let plain2 = decrypt(&sk, ciphertext2);
 
-    let m: i128 = 0;
-
-
-
-    let ciphertext = encrypt(pk, m);
-    decrypt(sk, ciphertext);
+    println!("Decrypted {}", plain1);
+    println!("Decrypted {}", plain2);
 }
