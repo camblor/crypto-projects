@@ -19,11 +19,11 @@ fn keygen() -> (PublicKey, SecretKey) {
     let n  = 20;
     let mut rng = rand::thread_rng();
     let s: i128 = rng.gen_range(0..10000);
-    let aaaa = Array::from_shape_fn((n, 1), |_|  rng.gen_range(0..Q));
-    let eeee = Array::from_shape_fn((n, 1), |_|  rng.gen_range(0..4));
-    let b  = (aaaa.clone() * s % Q) + eeee % Q;
+    let a = Array::from_shape_fn((n, 1), |_|  rng.gen_range(0..Q));
+    let e = Array::from_shape_fn((n, 1), |_|  rng.gen_range(0..4));
+    let b  = (a.clone() * s % Q) + e % Q;
 
-    (PublicKey{a: aaaa,b}, SecretKey(s))
+    (PublicKey{a,b}, SecretKey(s))
 }
 
 fn encrypt(pk: &PublicKey, m: i128) -> Ciphertext{
@@ -34,7 +34,7 @@ fn encrypt(pk: &PublicKey, m: i128) -> Ciphertext{
     Ciphertext {u, v}
 }
 
-fn decrypt(sk: &SecretKey, ciphertext: Ciphertext) -> (i32) {
+fn decrypt(sk: &SecretKey, ciphertext: Ciphertext) -> i32 {
     let mut res =  (ciphertext.v - sk.0*ciphertext.u) % Q;
     if res < 0 {
         res = Q + res;
@@ -48,15 +48,6 @@ fn decrypt(sk: &SecretKey, ciphertext: Ciphertext) -> (i32) {
 }
 
 fn main() {
-    // let (pk, sk) = keygen();
-
-    // let m: i128 = 0;
-
-
-
-    // let ciphertext = encrypt(pk, m);
-    // decrypt(sk, ciphertext);
-
     let (pk, sk) = keygen();
     let ciphertext1 = encrypt(&pk, 1);
     let ciphertext2 = encrypt(&pk, 1);
